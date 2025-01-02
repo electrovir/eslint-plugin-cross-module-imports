@@ -1,11 +1,9 @@
 import {assertWrap, check} from '@augment-vir/assert';
 import {log, type ArrayElement} from '@augment-vir/common';
+import {findAncestor, resolveImportPath} from '@augment-vir/node';
 import {type ImportDeclaration} from 'estree';
-import {resolve} from 'import-meta-resolve';
-import {readFileSync} from 'node:fs';
-import {dirname, relative} from 'node:path';
-import {fileURLToPath, pathToFileURL} from 'node:url';
-import {packageUpSync} from 'package-up';
+import {existsSync, readFileSync} from 'node:fs';
+import {dirname, join, relative} from 'node:path';
 import {type PackageJson} from 'type-fest';
 import {defineRule} from './rule.js';
 
@@ -17,13 +15,15 @@ function isFileInEsmPackage(filePath: string): boolean | undefined {
         return cachedFileIsEsm;
     }
 
-    const packageJsonPath = packageUpSync({
-        cwd: dirname(filePath),
-    });
+    const packageJsonDirPath = findAncestor(dirname(filePath), (path) =>
+        existsSync(join(path, 'package.json')),
+    );
 
-    if (!packageJsonPath) {
+    if (!packageJsonDirPath) {
         return undefined;
     }
+
+    const packageJsonPath = join(packageJsonDirPath, 'package.json');
 
     const cachedPackageJsonIsEsm = isEsmCache[packageJsonPath];
     if (check.isBoolean(cachedPackageJsonIsEsm)) {
@@ -63,9 +63,13 @@ export const noBadCjsImportsRule = defineRule(
         return {
             ImportDeclaration(node) {
                 const importPath = String(node.source.value);
-                const resolvedPath = fileURLToPath(
-                    resolve(importPath, String(pathToFileURL(filePath))),
-                );
+                const resolvedPath = resolveImportPath(filePath, importPath);
+
+                if (!resolvedPath) {
+                    throw new Error(
+                        `Unable to resolve import path for '${importPath}' from '${filePath}'`,
+                    );
+                }
 
                 const isImportEsm = isFileInEsmPackage(resolvedPath);
 
