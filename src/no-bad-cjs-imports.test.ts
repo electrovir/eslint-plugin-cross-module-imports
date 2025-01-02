@@ -59,6 +59,14 @@ ruleTester.run(noBadCjsImportsRule.name, noBadCjsImportsRule, {
             filename: join(testFilesDirPath, 'esm-package', 'esm.ts'),
         },
         {
+            name: 'accepts node imports',
+            code: `
+                        import * as fs from 'fs';
+                        import * as fs from 'node:fs';
+                    `,
+            filename: join(testFilesDirPath, 'esm-package', 'esm.ts'),
+        },
+        {
             name: 'accepts type namespace imports',
             code: `
                         import type * as doThing from '../cjs-package/cjs.js';

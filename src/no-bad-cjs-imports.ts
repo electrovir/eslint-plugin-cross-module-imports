@@ -3,6 +3,7 @@ import {log, type ArrayElement} from '@augment-vir/common';
 import {findAncestor, resolveImportPath} from '@augment-vir/node';
 import {type ImportDeclaration} from 'estree';
 import {existsSync, readFileSync} from 'node:fs';
+import {builtinModules} from 'node:module';
 import {dirname, join, relative} from 'node:path';
 import {type PackageJson} from 'type-fest';
 import {defineRule} from './rule.js';
@@ -63,6 +64,12 @@ export const noBadCjsImportsRule = defineRule(
         return {
             ImportDeclaration(node) {
                 const importPath = String(node.source.value);
+
+                if (importPath.startsWith('node:') || builtinModules.includes(importPath)) {
+                    /** No need to lint imports from Node.js's own built-in packages. */
+                    return;
+                }
+
                 const resolvedPath = resolveImportPath(filePath, importPath);
 
                 if (!resolvedPath) {
