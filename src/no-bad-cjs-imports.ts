@@ -4,7 +4,7 @@ import {findAncestor, resolveImportPath} from '@augment-vir/node';
 import {type ImportDeclaration} from 'estree';
 import {existsSync, readFileSync} from 'node:fs';
 import {builtinModules} from 'node:module';
-import {dirname, join, relative} from 'node:path';
+import {join, relative} from 'node:path';
 import {type PackageJson} from 'type-fest';
 import {defineRule} from './rule.js';
 
@@ -16,7 +16,7 @@ function isFileInEsmPackage(filePath: string): boolean | undefined {
         return cachedFileIsEsm;
     }
 
-    const packageJsonDirPath = findAncestor(dirname(filePath), (path) =>
+    const packageJsonDirPath = findAncestor(filePath, (path) =>
         existsSync(join(path, 'package.json')),
     );
 
