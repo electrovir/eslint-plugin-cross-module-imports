@@ -1,6 +1,6 @@
 {
     "name": "eslint-plugin-cross-module-imports",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "description": "Prevent accidental CJS imports that will fail in ESM runtime but not in TypeScript type checking.",
     "keywords": [
         "eslint",

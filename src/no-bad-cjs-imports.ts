@@ -2,9 +2,9 @@ import {assertWrap, check} from '@augment-vir/assert';
 import {log, type ArrayElement} from '@augment-vir/common';
 import {findAncestor, resolveImportPath} from '@augment-vir/node';
 import {type ImportDeclaration} from 'estree';
-import {existsSync, readFileSync} from 'node:fs';
+import {existsSync, readFileSync, statSync} from 'node:fs';
 import {builtinModules} from 'node:module';
-import {join, relative} from 'node:path';
+import {dirname, extname, join, relative, resolve} from 'node:path';
 import {type PackageJson} from 'type-fest';
 import {defineRule} from './rule.js';
 
@@ -41,6 +41,43 @@ function isFileInEsmPackage(filePath: string): boolean | undefined {
     return isEsm;
 }
 
+function findExactImportFile(importPath: string | undefined) {
+    if (
+        !importPath ||
+        /** We can't figure anything out if the path doesn't actually exist. */
+        !existsSync(importPath) ||
+        /** Import path is already to a file. */
+        !statSync(importPath).isDirectory()
+    ) {
+        return importPath;
+    }
+
+    const packageJsonPath = join(importPath, 'package.json');
+
+    if (!existsSync(packageJsonPath)) {
+        return packageJsonPath;
+    }
+
+    const packageJson = JSON.parse(String(readFileSync(packageJsonPath))) as PackageJson;
+
+    /** Might as well cache this since we already have the `package.json` parsed. */
+    isEsmCache[packageJsonPath] = packageJson.type === 'module';
+
+    const packageEntryPoint = packageJson.module || packageJson.main;
+
+    if (!packageEntryPoint) {
+        throw new Error(`No package entry point found for ${packageJsonPath}`);
+    }
+
+    const packageEntryPointPath = resolve(dirname(packageJsonPath), packageEntryPoint);
+
+    if (!existsSync(packageEntryPointPath)) {
+        throw new Error(`Package entry point does not exist: '${packageEntryPointPath}'`);
+    }
+
+    return packageEntryPointPath;
+}
+
 export const noBadCjsImportsRule = defineRule(
     'no-bad-cjs-imports',
     {
@@ -70,12 +107,22 @@ export const noBadCjsImportsRule = defineRule(
                     return;
                 }
 
-                const resolvedPath = resolveImportPath(filePath, importPath);
+                const resolvedPath = findExactImportFile(resolveImportPath(filePath, importPath));
 
                 if (!resolvedPath) {
                     throw new Error(
                         `Unable to resolve import path for '${importPath}' from '${filePath}'`,
                     );
+                }
+                const extension = extname(resolvedPath);
+
+                if (!extension) {
+                    throw new Error(
+                        `No extension found for import path: '${importPath}' resolved to '${resolvedPath}' from '${filePath}'`,
+                    );
+                } else if (!extension.includes('ts')) {
+                    /** Don't bother checking non-ts files. */
+                    return;
                 }
 
                 const isImportEsm = isFileInEsmPackage(resolvedPath);
